@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Reveal</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Montserrat:wght@300&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --glow-color: hsl(186, 100%, 50%);
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: 'Montserrat', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            /* Transition for smooth start/stop of shake */
+            transition: transform 0.1s ease-out;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            display: none; /* Hidden until start */
+        }
+
+        #content-container {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #start-button {
+            font-family: 'Cinzel', serif;
+            font-size: 2rem;
+            padding: 1rem 2rem;
+            background: #111;
+            border: 2px solid #fff;
+            color: #fff;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        #start-button:hover {
+            background: #fff;
+            color: #000;
+            box-shadow: 0 0 20px #fff;
+        }
+
+        #countdown-container {
+            display: none; /* Hidden until start */
+        }
+
+        #countdown-number {
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            font-size: 15vw;
+            line-height: 1;
+            opacity: 0;
+            animation: fadeInOut 1s ease-in-out infinite;
+        }
+
+        #countdown-text {
+            font-size: 3vw;
+            margin-top: 20px;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            color: #aaa;
+        }
+        
+        @keyframes fadeInOut {
+            0%, 100% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="fireworks-canvas"></canvas>
+
+    <div id="content-container">
+        <button id="start-button">Begin</button>
+
+        <div id="countdown-container">
+            <div id="countdown-number">5</div>
+            <div id="countdown-text">The moment approaches</div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- DOM Elements ---
+        const startButton = document.getElementById('start-button');
+        const countdownContainer = document.getElementById('countdown-container');
+        const countdownNumberEl = document.getElementById('countdown-number');
+        const countdownTextEl = document.getElementById('countdown-text');
+        const canvas = document.getElementById('fireworks-canvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- Global State ---
+        let fireworks = [];
+        let particles = [];
+        let lasers = [];
+        let stars = [];
+        let animationFrameId;
+        let isCountdownActive = false;
+        let isRevealed = false;
+        let postRevealActionsStarted = false;
+        let laserRotationSpeedMultiplier = 1;
+        let shakeIntensity = 0;
+
+        // --- Sound Synthesis using Tone.js ---
+        const synth = new Tone.PolySynth(Tone.Synth, {
+            oscillator: { type: 'fatsawtooth', count: 3, spread: 30 },
+            envelope: {
+                attack: 0.01,
+                decay: 0.1,
+                sustain: 0.5,
+                release: 0.4,
+                attackCurve: 'exponential',
+            },
+        }).toDestination();
+
+        const reverb = new Tone.Reverb({ decay: 5, wet: 0.6 }).toDestination();
+        synth.connect(reverb);
+
+        Tone.Destination.volume.value = -12;
+
+        const countdownMessages = {
+            5: "The moment approaches",
+            4: "Anticipation builds",
+            3: "Hold your breath",
+            2: "Prepare for the inevitable",
+            1: "Now...",
+        };
+
+        // --- Event Listeners ---
+        startButton.addEventListener('click', () => {
+            startButton.style.display = 'none';
+            countdownContainer.style.display = 'block';
+            canvas.style.display = 'block';
+            Tone.start();
+            resizeCanvas();
+            createStars();
+            animate();
+            startCountdown();
+        });
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Core Functions ---
+        function startCountdown() {
+            let count = 5;
+            isCountdownActive = true;
+            shakeIntensity = 2; // Start with a gentle shake
+            const lowpass = new Tone.Filter(10000, "lowpass").toDestination();
+            synth.connect(lowpass);
+
+            synth.triggerAttack("C2", Tone.now());
+            addLasers();
+
+            const interval = setInterval(() => {
+                count--;
+                lowpass.frequency.rampTo(10000 - (count * 1500), 0.5);
+                laserRotationSpeedMultiplier += 0.75;
+                // Increase shake intensity more aggressively
+                shakeIntensity += 8; 
+
+                if (count > 0) {
+                    countdownNumberEl.textContent = count;
+                    countdownTextEl.textContent = countdownMessages[count];
+                    synth.triggerAttackRelease(count % 2 === 0 ? "G2" : "G#2", "8n", Tone.now() + 0.1);
+                    addLasers();
+                } else {
+                    clearInterval(interval);
+                    isCountdownActive = false;
+                    lasers = [];
+                    
+                    countdownContainer.style.display = 'none';
+                    
+                    // Create a noise synth for the drumroll
+                    const drum = new Tone.NoiseSynth({
+                        noise: { type: 'white' },
+                        envelope: { attack: 0.001, decay: 0.1, sustain: 0, release: 0.05 }
+                    }).toDestination();
+
+                    // Start playing the drumroll
+                    const drumInterval = setInterval(() => {
+                        drum.triggerAttack(Tone.now(), Math.random() * 0.3 + 0.7); // Vary velocity for realism
+                    }, 60);
+
+                    // First pause with shake and drumroll
+                    setTimeout(() => {
+                        // Stop the drumroll
+                        clearInterval(drumInterval);
+
+                        // Stop the shake and the drone sound
+                        shakeIntensity = 0;
+                        synth.triggerRelease("C2", Tone.now());
+                        
+                        // Second pause without shake
+                        setTimeout(() => {
+                            reveal();
+                        }, 2500); // 2-second pause after shake stops
+
+                    }, 2000); // 2-second pause with shake
+                }
+            }, 1500);
+        }
+
+        function reveal() {
+            isRevealed = true;
+            // Music and fireworks are now started inside drawYesText()
+        }
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            stars = [];
+            createStars();
+        }
+
+        // --- Visual Effects Classes & Functions ---
+        const gravity = 0.05;
+
+        class Star {
+            constructor(x, y, radius) {
+                this.x = x;
+                this.y = y;
+                this.radius = radius;
+                this.vx = (Math.random() - 0.5) * 0.2;
+                this.vy = (Math.random() - 0.5) * 0.2;
+                this.alpha = Math.random() * 0.5 + 0.1;
+                this.alphaDirection = (Math.random() > 0.5) ? 1 : -1;
+            }
+            update() {
+                this.alpha += (Math.random() * 0.005) * this.alphaDirection;
+                if (this.alpha <= 0.1 || this.alpha >= 0.6) this.alphaDirection *= -1;
+                this.x += this.vx;
+                this.y += this.vy;
+                if (this.x > canvas.width + this.radius) this.x = -this.radius;
+                if (this.x < -this.radius) this.x = canvas.width + this.radius;
+                if (this.y > canvas.height + this.radius) this.y = -this.radius;
+                if (this.y < -this.radius) this.y = canvas.height + this.radius;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2, false);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        class Laser {
+            constructor(centerX, centerY, angle, length, color) {
+                this.centerX = centerX;
+                this.centerY = centerY;
+                this.angle = angle;
+                this.length = length;
+                this.color = color;
+                this.rotationSpeed = (Math.random() - 0.5) * 0.04;
+                this.width = 2;
+            }
+            draw() {
+                const startX = this.centerX;
+                const startY = this.centerY;
+                const endX = this.centerX + Math.cos(this.angle) * this.length;
+                const endY = this.centerY + Math.sin(this.angle) * this.length;
+                ctx.beginPath();
+                ctx.moveTo(startX, startY);
+                ctx.lineTo(endX, endY);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = this.width;
+                ctx.stroke();
+            }
+            update() {
+                this.angle += this.rotationSpeed * laserRotationSpeedMultiplier;
+                this.draw();
+            }
+        }
+
+        class Particle {
+            constructor(x, y, color, velocity) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.velocity = velocity;
+                this.alpha = 1;
+                this.life = Math.random() * 50 + 30;
+            }
+            draw() {
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, 2, 0, Math.PI * 2, false);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+            }
+            update() {
+                this.draw();
+                this.velocity.x *= 0.98;
+                this.velocity.y += gravity;
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.alpha -= 0.025;
+                this.life--;
+            }
+        }
+
+        class Firework {
+            constructor(x, y, targetX, targetY) {
+                this.x = x;
+                this.y = y;
+                this.targetX = targetX;
+                this.targetY = targetY;
+                this.color = `hsl(${Math.random() * 360}, 100%, 50%)`;
+                this.trail = [];
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.moveTo(this.trail[0]?.x || this.x, this.trail[0]?.y || this.y);
+                ctx.lineTo(this.x, this.y);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            update(index) {
+                this.trail.push({ x: this.x, y: this.y });
+                if (this.trail.length > 10) this.trail.shift();
+                this.draw();
+                const angle = Math.atan2(this.targetY - this.y, this.targetX - this.x);
+                const speed = 12;
+                this.x += Math.cos(angle) * speed;
+                this.y += Math.sin(angle) * speed;
+                const distance = Math.hypot(this.targetX - this.x, this.targetY - this.y);
+                if (distance < speed) {
+                    this.explode();
+                    fireworks.splice(index, 1);
+                }
+            }
+            explode() {
+                const particleCount = 60;
+                const angleIncrement = (Math.PI * 2) / particleCount;
+                for (let i = 0; i < particleCount; i++) {
+                    const power = Math.random() * 5 + 2;
+                    particles.push(new Particle(this.x, this.y, this.color, {
+                        x: Math.cos(angleIncrement * i) * power,
+                        y: Math.sin(angleIncrement * i) * power
+                    }));
+                }
+            }
+        }
+
+        function drawYesText() {
+            ctx.save();
+            ctx.globalAlpha = 1;
+            ctx.translate(canvas.width / 2, canvas.height / 2);
+            ctx.scale(1, 1);
+
+            const fontSize = canvas.width * 0.35;
+            ctx.font = `900 ${fontSize}px Cinzel`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const time = Date.now();
+            const pulse = Math.sin(time / 200) * 5 + 10;
+            // Continuously cycle through the entire color spectrum, slowed down
+            const hue = (time / 15) % 360;
+
+            ctx.shadowColor = `hsl(${hue}, 100%, 50%)`;
+            ctx.shadowBlur = pulse + 30;
+            ctx.fillStyle = `hsl(${hue}, 100%, 50%)`;
+            ctx.fillText("YES", 0, 0);
+            
+            ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
+            ctx.shadowBlur = pulse;
+            ctx.fillStyle = 'white';
+            ctx.fillText("YES", 0, 0);
+
+            ctx.shadowColor = 'transparent';
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.fillText("YES", 0, 0);
+
+            ctx.restore();
+            
+            // Start fireworks and music only when the animation is complete
+            if (!postRevealActionsStarted) {
+                // Play triumphant chime music
+                synth.triggerAttackRelease(['C4', 'E4', 'G4', 'C5'], '1n', Tone.now());
+                synth.triggerAttackRelease(['G4', 'B4', 'D5', 'G5'], '1n', Tone.now() + 1);
+                synth.triggerAttackRelease(['F4', 'A4', 'C5', 'F5'], '1n', Tone.now() + 2);
+                synth.triggerAttackRelease(['C5', 'E5', 'G5', 'C6'], '2n', Tone.now() + 3);
+
+                // Start fireworks
+                setInterval(() => {
+                    // Reduced number of fireworks
+                    for (let i = 0; i < 2; i++) {
+                        launchFirework();
+                    }
+                }, 200);
+                postRevealActionsStarted = true;
+            }
+        }
+
+        function createStars() {
+            const starCount = 150;
+            for (let i = 0; i < starCount; i++) {
+                const x = Math.random() * canvas.width;
+                const y = Math.random() * canvas.height;
+                const radius = Math.random() * 1.5;
+                stars.push(new Star(x, y, radius));
+            }
+        }
+
+        function addLasers() {
+            const num = Math.floor(Math.random() * 4) + 3;
+            for (let i = 0; i < num; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                const length = canvas.width + canvas.height;
+                const color = `hsl(${Math.random() * 360}, 100%, 70%)`;
+                lasers.push(new Laser(canvas.width / 2, canvas.height / 2, angle, length, color));
+            }
+        }
+
+        function launchFirework() {
+            const startX = Math.random() * canvas.width;
+            const startY = Math.random() * canvas.height;
+            const targetX = Math.random() * canvas.width;
+            const targetY = Math.random() * canvas.height;
+            fireworks.push(new Firework(startX, startY, targetX, targetY));
+        }
+
+        // --- Main Animation Loop ---
+        function animate() {
+            animationFrameId = requestAnimationFrame(animate);
+
+            // Apply screen shake
+            if (shakeIntensity > 0) {
+                const shakeX = (Math.random() - 0.5) * shakeIntensity;
+                const shakeY = (Math.random() - 0.5) * shakeIntensity;
+                document.body.style.transform = `translate(${shakeX}px, ${shakeY}px)`;
+            } else {
+                document.body.style.transform = 'translate(0, 0)';
+            }
+
+            // Clear and draw canvas elements
+            ctx.globalAlpha = 0.15;
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            stars.forEach(star => {
+                star.update();
+                star.draw();
+            });
+
+            ctx.globalAlpha = 1;
+
+            if (isCountdownActive) {
+                lasers.forEach(laser => laser.update());
+            } else {
+                // Only draw fireworks if they have been started
+                if(postRevealActionsStarted) {
+                    fireworks.forEach((firework, i) => firework.update(i));
+                }
+                particles.forEach((particle, i) => {
+                    if (particle.alpha > 0 && particle.life > 0) {
+                        particle.update();
+                    } else {
+                        particles.splice(i, 1);
+                    }
+                });
+            }
+
+            if (isRevealed) {
+                drawYesText();
+            }
+        }
+    </script>
+</body>
+</html>
