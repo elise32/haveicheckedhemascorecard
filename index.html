@@ -69,6 +69,18 @@
             box-shadow: 0 0 20px #fff;
         }
 
+        #version {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 0.6rem;
+            color: #fff;
+            font-family: 'Montserrat', sans-serif;
+            font-weight: 300;
+            letter-spacing: 1px;
+            opacity: 0.2;
+        }
+
         #countdown-container {
             display: none; /* Hidden until start */
         }
@@ -109,6 +121,8 @@
         </div>
 
     </div>
+
+    <div id="version">v1.0</div>
 
     <script>
         // --- DOM Elements ---
@@ -159,6 +173,7 @@
         // --- Event Listeners ---
         startButton.addEventListener('click', () => {
             startButton.style.display = 'none';
+            document.getElementById('version').style.display = 'none';
             countdownContainer.style.display = 'block';
             canvas.style.display = 'block';
             Tone.start();
