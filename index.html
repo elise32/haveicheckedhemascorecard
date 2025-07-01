@@ -107,6 +107,50 @@
             0%, 100% { opacity: 0; transform: scale(0.8); }
             50% { opacity: 1; transform: scale(1); }
         }
+
+        .marquee {
+            position: absolute;
+            width: 100%;
+            overflow: hidden;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 5px 0;
+            box-sizing: border-box;
+            white-space: nowrap;
+            font-family: 'Cinzel', serif;
+            font-size: 1.5rem;
+            color: var(--glow-color);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            display: none;
+            z-index: 3;
+        }
+
+        .marquee span {
+            display: inline-block;
+            animation: marquee-animation 15s linear infinite;
+        }
+
+        #marquee-top {
+            top: 0;
+        }
+
+        #marquee-bottom {
+            bottom: 0;
+        }
+
+        #marquee-bottom span {
+            animation: marquee-animation-reverse 15s linear infinite;
+        }
+
+        @keyframes marquee-animation {
+            0% { transform: translateX(0%); }
+            100% { transform: translateX(-50%); }
+        }
+
+        @keyframes marquee-animation-reverse {
+            0% { transform: translateX(-50%); }
+            100% { transform: translateX(0%); }
+        }
     </style>
 </head>
 <body>
@@ -120,7 +164,13 @@
             <div id="countdown-number">5</div>
             <div id="countdown-text">The moment approaches</div>
         </div>
+        </div>
 
+    <div id="marquee-top" class="marquee">
+        <span>THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • </span>
+    </div>
+    <div id="marquee-bottom" class="marquee">
+        <span>THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • THE ANSWER IS IMMINENT • </span>
     </div>
 
     <div id="version">v1.0</div>
@@ -133,6 +183,8 @@
         const countdownTextEl = document.getElementById('countdown-text');
         const canvas = document.getElementById('fireworks-canvas');
         const ctx = canvas.getContext('2d');
+        const marqueeTop = document.getElementById('marquee-top');
+        const marqueeBottom = document.getElementById('marquee-bottom');
 
         // --- Global State ---
         let fireworks = [];
@@ -177,6 +229,8 @@
             document.getElementById('version').style.display = 'none';
             countdownContainer.style.display = 'block';
             canvas.style.display = 'block';
+            marqueeTop.style.display = 'block';
+            marqueeBottom.style.display = 'block';
             Tone.start();
             resizeCanvas();
             createStars();
@@ -235,6 +289,9 @@
                         // Stop the shake and the drone sound
                         shakeIntensity = 0;
                         synth.triggerRelease("C2", Tone.now());
+                        
+                        marqueeTop.style.display = 'none';
+                        marqueeBottom.style.display = 'none';
                         
                         // Second pause without shake
                         setTimeout(() => {
